@@ -134,7 +134,7 @@ class AppController(private val context: Context) {
         preferences.notifyStart = start; preferences.notifyEnd = end; preferences.notifyBefore = before
         NotificationScheduler.reschedule(context)
     }
-    fun setThemeMode(mode: ThemeMode) { themeMode = mode; preferences.themeMode = mode.name }
+    fun updateThemeMode(mode: ThemeMode) { themeMode = mode; preferences.themeMode = mode.name }
 }
 
 @Composable
@@ -488,9 +488,9 @@ private fun SettingsScreen(controller: AppController) = Scaffold(topBar = { Titl
                     Text("وضع الألوان", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected = controller.themeMode == ThemeMode.SYSTEM, onClick = { controller.setThemeMode(ThemeMode.SYSTEM) }, shape = SegmentedButtonDefaults.itemShape(0, 3), icon = { Icon(Icons.Default.SettingsBrightness, null, modifier = Modifier.size(18.dp)) }) { Text("تلقائي") }
-                        SegmentedButton(selected = controller.themeMode == ThemeMode.LIGHT, onClick = { controller.setThemeMode(ThemeMode.LIGHT) }, shape = SegmentedButtonDefaults.itemShape(1, 3), icon = { Icon(Icons.Default.LightMode, null, modifier = Modifier.size(18.dp)) }) { Text("فاتح") }
-                        SegmentedButton(selected = controller.themeMode == ThemeMode.DARK, onClick = { controller.setThemeMode(ThemeMode.DARK) }, shape = SegmentedButtonDefaults.itemShape(2, 3), icon = { Icon(Icons.Default.DarkMode, null, modifier = Modifier.size(18.dp)) }) { Text("داكن") }
+                        SegmentedButton(selected = controller.themeMode == ThemeMode.SYSTEM, onClick = { controller.updateThemeMode(ThemeMode.SYSTEM) }, shape = SegmentedButtonDefaults.itemShape(0, 3), icon = { Icon(Icons.Default.SettingsBrightness, null, modifier = Modifier.size(18.dp)) }) { Text("تلقائي") }
+                        SegmentedButton(selected = controller.themeMode == ThemeMode.LIGHT, onClick = { controller.updateThemeMode(ThemeMode.LIGHT) }, shape = SegmentedButtonDefaults.itemShape(1, 3), icon = { Icon(Icons.Default.LightMode, null, modifier = Modifier.size(18.dp)) }) { Text("فاتح") }
+                        SegmentedButton(selected = controller.themeMode == ThemeMode.DARK, onClick = { controller.updateThemeMode(ThemeMode.DARK) }, shape = SegmentedButtonDefaults.itemShape(2, 3), icon = { Icon(Icons.Default.DarkMode, null, modifier = Modifier.size(18.dp)) }) { Text("داكن") }
                     }
                 }
             }
