@@ -27,11 +27,19 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest runners already ship an Android SDK (ANDROID_SDK_ROOT is
+      # preset). We just point ANDROID_HOME at it and install the exact
+      # platform/build-tools this project needs, instead of adding a
+      # third-party SDK-setup action.
+      - name: Configure Android SDK env
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
       - name: Install required SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Run unit tests
         run: gradle testDebugUnitTest --stacktrace
