@@ -46,7 +46,9 @@ object NotificationScheduler {
         val prefs = AppPreferences(context)
         prefs.scheduledIds.forEach { raw ->
             val parts = raw.split("|")
-            if (parts.size == 2) manager.cancel(pendingIntent(context, parts[0], parts[1], false))
+            if (parts.size == 2) {
+                pendingIntent(context, parts[0], parts[1], false)?.let { manager.cancel(it) }
+            }
         }
         prefs.scheduledIds = emptySet()
     }
@@ -86,7 +88,10 @@ object NotificationScheduler {
     }
 
     // PendingIntent recreation uses a stable token/request code for alarm cancellation.
-    private fun pendingIntent(context: Context, code: String, type: String, create: Boolean): PendingIntent {
+    // With FLAG_NO_CREATE, Android returns null when no matching PendingIntent is
+    // currently registered (e.g. stale ids left over from a previous install) —
+    // that is expected, not an error, so the return type must be nullable.
+    private fun pendingIntent(context: Context, code: String, type: String, create: Boolean): PendingIntent? {
         val intent = Intent(context, AlarmReceiver::class.java).setAction(if (type == "refresh") ACTION_REFRESH else ACTION_NOTIFY)
         val flags = (if (create) PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_NO_CREATE) or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getBroadcast(context, code.toIntOrNull() ?: code.hashCode(), intent, flags)

@@ -124,16 +124,20 @@ class AppController(private val context: Context) {
         val result: DataLoadResult = repository.load()
         data = result.data
         errors = result.errors
-        if (data != null && selection != null) NotificationScheduler.reschedule(context)
+        if (data != null && selection != null) safeReschedule()
     }
     fun restore() { errors = repository.restoreDefaults(); reload() }
-    fun saveSelection(value: UserSelection) { preferences.selection = value; selection = value; screen = Screen.HOME; NotificationScheduler.reschedule(context) }
-    fun clearSelection() { preferences.selection = null; selection = null; NotificationScheduler.cancelAll(context) }
+    fun saveSelection(value: UserSelection) { preferences.selection = value; selection = value; screen = Screen.HOME; safeReschedule() }
+    fun clearSelection() { preferences.selection = null; selection = null; safeCancelAll() }
     fun updateNotifications(start: Boolean = notifyStart, end: Boolean = notifyEnd, before: Boolean = notifyBefore) {
         notifyStart = start; notifyEnd = end; notifyBefore = before
         preferences.notifyStart = start; preferences.notifyEnd = end; preferences.notifyBefore = before
-        NotificationScheduler.reschedule(context)
+        safeReschedule()
     }
+    // Scheduling notifications is a nice-to-have: a failure here (stale alarm
+    // ids, OEM quirks, etc.) must never crash the whole screen on startup.
+    private fun safeReschedule() { runCatching { NotificationScheduler.reschedule(context) } }
+    private fun safeCancelAll() { runCatching { NotificationScheduler.cancelAll(context) } }
     fun updateThemeMode(mode: ThemeMode) { themeMode = mode; preferences.themeMode = mode.name }
 }
 
