@@ -28,10 +28,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -43,6 +46,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -50,6 +54,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -69,6 +75,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,6 +86,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -93,15 +101,21 @@ import com.schoolschedule.app.domain.ScheduleEngine
 import com.schoolschedule.app.domain.UserRole
 import com.schoolschedule.app.domain.UserSelection
 import com.schoolschedule.app.notifications.NotificationScheduler
+import com.schoolschedule.app.ui.theme.LogoDeepBlue
+import com.schoolschedule.app.ui.theme.LogoGold
+import com.schoolschedule.app.ui.theme.LogoOrange
+import com.schoolschedule.app.ui.theme.LogoSkyBlue
 import com.schoolschedule.app.ui.theme.SchoolScheduleTheme
 import com.schoolschedule.app.ui.theme.ThemeMode
 import com.schoolschedule.app.ui.theme.subjectColor
 import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneOffset
 
-enum class Screen { HOME, TODAY, FULL, SETTINGS }
+enum class Screen { HOME, TODAY, TOMORROW, FULL, SETTINGS }
 
 class AppController(private val context: Context) {
     private val repository = StorageRepository(context)
@@ -139,6 +153,18 @@ class AppController(private val context: Context) {
     private fun safeReschedule() { runCatching { NotificationScheduler.reschedule(context) } }
     private fun safeCancelAll() { runCatching { NotificationScheduler.cancelAll(context) } }
     fun updateThemeMode(mode: ThemeMode) { themeMode = mode; preferences.themeMode = mode.name }
+
+    fun saveHoliday(date: java.time.LocalDate, note: String, previousDate: java.time.LocalDate? = null) {
+        val current = data?.holidays.orEmpty().toMutableMap()
+        if (previousDate != null && previousDate != date) current.remove(previousDate)
+        current[date] = note.takeIf { it.isNotBlank() }
+        if (repository.saveHolidays(current)) reload()
+    }
+    fun removeHoliday(date: java.time.LocalDate) {
+        val current = data?.holidays.orEmpty().toMutableMap()
+        current.remove(date)
+        if (repository.saveHolidays(current)) reload()
+    }
 }
 
 @Composable
@@ -222,6 +248,7 @@ private fun SetupScreen(controller: AppController) {
 private val bottomDestinations = listOf(
     Triple(Screen.HOME, "الرئيسية", Icons.Default.Home),
     Triple(Screen.TODAY, "اليوم", Icons.Default.CalendarToday),
+    Triple(Screen.TOMORROW, "غدًا", Icons.Default.EventNote),
     Triple(Screen.FULL, "الجدول", Icons.Default.CalendarMonth),
     Triple(Screen.SETTINGS, "الإعدادات", Icons.Default.Settings),
 )
@@ -252,6 +279,7 @@ private fun MainScaffold(controller: AppController) {
                 when (screen) {
                     Screen.HOME -> HomeScreen(controller)
                     Screen.TODAY -> TableScreen(controller, todayOnly = true)
+                    Screen.TOMORROW -> DayAheadScreen(controller)
                     Screen.FULL -> TableScreen(controller, todayOnly = false)
                     Screen.SETTINGS -> SettingsScreen(controller)
                 }
@@ -277,20 +305,22 @@ private fun HomeScreen(controller: AppController) {
             }
             if (todayLessons.isNotEmpty()) {
                 item { Text("خط سير اليوم", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-                item { DayTimeline(todayLessons, now.toLocalTime()) }
+                item { DayTimeline(todayLessons, now.toLocalTime(), selection.role == UserRole.TEACHER) }
             }
         }
     }
 }
 
 @Composable
-private fun DayTimeline(lessons: List<Lesson>, now: LocalTime) {
+private fun DayTimeline(lessons: List<Lesson>, now: LocalTime, teacher: Boolean) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         items(lessons) { lesson ->
             val isPast = now.isAfter(lesson.period.end)
             val isCurrent = !now.isBefore(lesson.period.start) && now.isBefore(lesson.period.end)
             val colors = subjectColor(lesson.subject, dark)
+            val primaryText = if (teacher) lesson.grades.joinToString(" + ") else lesson.subject
+            val secondaryText = if (teacher) "${lesson.subject} • ${lesson.period.start}" else "${lesson.period.start}"
             Card(
                 modifier = Modifier.width(132.dp),
                 shape = MaterialTheme.shapes.medium,
@@ -310,15 +340,49 @@ private fun DayTimeline(lessons: List<Lesson>, now: LocalTime) {
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        lesson.subject, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium,
+                        primaryText, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium,
                         color = if (isCurrent) MaterialTheme.colorScheme.onPrimary else colors.onContainer, maxLines = 1,
                     )
                     Text(
-                        "${lesson.period.start}", style = MaterialTheme.typography.bodySmall,
+                        secondaryText, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                         color = if (isCurrent) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else colors.onContainer.copy(alpha = 0.75f),
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DayAheadScreen(controller: AppController) {
+    val data = requireNotNull(controller.data); val selection = requireNotNull(controller.selection)
+    val engine = remember(data) { ScheduleEngine(data) }
+    val date = remember { LocalDate.now().plusDays(1) }
+    val lessons = remember(date, data, selection) { engine.lessonsFor(date, selection) }
+    Scaffold(topBar = { TitleBar("برنامج غدًا") }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item { HeaderDate(engine, date, selection) }
+            when {
+                engine.isHoliday(date) -> item {
+                    StatusMessageCard("غدًا عطلة 🌤️", engine.holidayNote(date) ?: "الجمعة والسبت والعطل الاستثنائية لا تحتوي على حصص.", offDay = true)
+                }
+                lessons.isEmpty() && selection.role == UserRole.TEACHER -> item {
+                    StatusMessageCard("غدًا عطلتك المميزة 🎉", "استمتع بوقت فراغك", offDay = true)
+                }
+                lessons.isEmpty() -> item { EmptyCard("لا توجد حصص مسجلة") }
+                else -> item { DayTable(engine.dayName(date), lessons, selection.role == UserRole.TEACHER, now = null) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusMessageCard(title: String, subtitle: String, offDay: Boolean) {
+    val brush = if (offDay) Brush.linearGradient(listOf(LogoGold, LogoOrange)) else Brush.linearGradient(listOf(LogoSkyBlue, LogoDeepBlue))
+    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(brush).padding(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(subtitle, color = Color.White.copy(alpha = 0.92f))
         }
     }
 }
@@ -334,49 +398,70 @@ private fun HeaderDate(engine: ScheduleEngine, date: LocalDate, selection: UserS
 }
 
 @Composable
-private fun CurrentStatusCard(status: DayStatus, teacher: Boolean) = Card(
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    shape = MaterialTheme.shapes.large,
-    modifier = Modifier.fillMaxWidth(),
-) {
-    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        when (status) {
-            DayStatus.Holiday -> { Text("اليوم عطلة 🌤️", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); Text("الجمعة والسبت والعطل الاستثنائية لا تحتوي على حصص.") }
-            DayStatus.Finished -> { Text("انتهى الدوام اليوم ✅", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); Text("يمكنك مراجعة جدول اليوم أو الجدول الكامل من الأسفل.") }
-            is DayStatus.BeforeStart -> { Text("لم يبدأ الدوام بعد", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); NextLesson(status.next, status.next.period.start, status = null, teacher = teacher) }
-            is DayStatus.Break -> {
-                Text("استراحة ☕", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                status.next?.let { NextLesson(it, it.period.start, status.remainingSeconds, teacher) } ?: Text("لا توجد حصة قادمة اليوم")
-            }
-            is DayStatus.InLesson -> {
-                Text("الحصة الحالية", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                LessonDetails(status.current, teacher, prominent = true)
-                val totalSeconds = java.time.Duration.between(status.current.period.start, status.current.period.end).seconds.coerceAtLeast(1)
-                val progress = (1f - status.remainingSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
-                LinearProgressIndicator(
-                    progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)),
-                    trackColor = MaterialTheme.colorScheme.surface,
-                )
-                Text("باقي ${formatDuration(status.remainingSeconds)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Divider(Modifier.padding(vertical = 4.dp))
-                Text("الحصة القادمة", style = MaterialTheme.typography.labelLarge)
-                status.next?.let { NextLesson(it, it.period.start, null, teacher) } ?: Text("لا توجد حصة قادمة اليوم")
+private fun CurrentStatusCard(status: DayStatus, teacher: Boolean) {
+    val isOffDay = status is DayStatus.Holiday || status is DayStatus.NoLessonsToday
+    val brush = if (isOffDay) Brush.linearGradient(listOf(LogoGold, LogoOrange)) else Brush.linearGradient(listOf(LogoSkyBlue, LogoDeepBlue))
+    val onColor = Color.White
+    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(brush).padding(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            when (status) {
+                is DayStatus.Holiday -> {
+                    Text("اليوم عطلة 🌤️", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
+                    Text(status.note ?: "الجمعة والسبت والعطل الاستثنائية لا تحتوي على حصص.", color = onColor.copy(alpha = 0.92f))
+                }
+                DayStatus.NoLessonsToday -> if (teacher) {
+                    Text("اليوم عطلتك المميزة 🎉", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
+                    Text("استمتع بوقت فراغك", color = onColor.copy(alpha = 0.92f))
+                } else {
+                    Text("لا توجد لديك حصص اليوم", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
+                }
+                DayStatus.Finished -> {
+                    Text("انتهى الدوام اليوم ✅", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
+                    Text("يمكنك مراجعة جدول اليوم أو الجدول الكامل من الأسفل.", color = onColor.copy(alpha = 0.92f))
+                }
+                is DayStatus.BeforeStart -> {
+                    Text("لم يبدأ الدوام بعد", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = onColor)
+                    NextLesson(status.next, status.next.period.start, remaining = null, teacher = teacher, contentColor = onColor)
+                }
+                is DayStatus.Break -> {
+                    Text("استراحة ☕", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
+                    status.next?.let { NextLesson(it, it.period.start, status.remainingSeconds, teacher, onColor) } ?: Text("لا توجد حصة قادمة اليوم", color = onColor)
+                }
+                is DayStatus.InLesson -> {
+                    Text("الحصة الحالية", style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.85f))
+                    LessonDetails(status.current, teacher, onColor, prominent = true)
+                    val totalSeconds = java.time.Duration.between(status.current.period.start, status.current.period.end).seconds.coerceAtLeast(1)
+                    val progress = (1f - status.remainingSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+                    LinearProgressIndicator(
+                        progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)),
+                        color = onColor, trackColor = onColor.copy(alpha = 0.28f),
+                    )
+                    Text("باقي ${formatDuration(status.remainingSeconds)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = onColor)
+                    Divider(Modifier.padding(vertical = 4.dp), color = onColor.copy(alpha = 0.3f))
+                    Text("الحصة القادمة", style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.85f))
+                    status.next?.let { NextLesson(it, it.period.start, null, teacher, onColor) } ?: Text("لا توجد حصة قادمة اليوم", color = onColor)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun NextLesson(lesson: Lesson, starts: LocalTime, status: Long?, teacher: Boolean) {
-    LessonDetails(lesson, teacher)
-    Text("تبدأ ${starts}", fontWeight = FontWeight.Medium)
-    if (status != null) Text("بعد ${formatDuration(status)}")
+private fun NextLesson(lesson: Lesson, starts: LocalTime, remaining: Long?, teacher: Boolean, contentColor: Color) {
+    LessonDetails(lesson, teacher, contentColor)
+    Text("تبدأ $starts", fontWeight = FontWeight.Medium, color = contentColor)
+    if (remaining != null) Text("بعد ${formatDuration(remaining)}", color = contentColor.copy(alpha = 0.92f))
 }
 
+// For a teacher, the class/grade matters more in the moment than the subject
+// (they already know what they teach) — so it's shown as the headline, with
+// the subject as supporting detail. For a student it's the other way round.
 @Composable
-private fun LessonDetails(lesson: Lesson, teacher: Boolean, prominent: Boolean = false) = Column {
-    Text("الحصة ${lesson.period.id} — ${lesson.subject}", style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    if (teacher) Text(lesson.grades.joinToString(" + "), color = MaterialTheme.colorScheme.onPrimaryContainer)
+private fun LessonDetails(lesson: Lesson, teacher: Boolean, contentColor: Color, prominent: Boolean = false) = Column {
+    val headline = if (teacher) lesson.grades.joinToString(" + ") else lesson.subject
+    val secondary = if (teacher) "${lesson.subject} — الحصة ${lesson.period.id}" else "الحصة ${lesson.period.id}"
+    Text(headline, style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
+    Text(secondary, color = contentColor.copy(alpha = 0.9f))
 }
 
 @Composable
@@ -393,9 +478,13 @@ private fun TableScreen(controller: AppController, todayOnly: Boolean) {
                     SegmentedButton(selected = teacherTab == 1, onClick = { teacherTab = 1 }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("برنامجي الأسبوعي") }
                 }
             }
+            val today = LocalDate.now()
             LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (todayOnly && engine.isHoliday(LocalDate.now())) item { EmptyCard("اليوم عطلة") }
-                else if (!todayOnly && selection.role == UserRole.TEACHER && teacherTab == 1) {
+                if (todayOnly && engine.isHoliday(today)) {
+                    item { StatusMessageCard("اليوم عطلة 🌤️", engine.holidayNote(today) ?: "الجمعة والسبت والعطل الاستثنائية لا تحتوي على حصص.", offDay = true) }
+                } else if (todayOnly && selection.role == UserRole.TEACHER && engine.lessonsForDay(days.first(), selection).isEmpty()) {
+                    item { StatusMessageCard("اليوم عطلتك المميزة 🎉", "استمتع بوقت فراغك", offDay = true) }
+                } else if (!todayOnly && selection.role == UserRole.TEACHER && teacherTab == 1) {
                     items(days) { day -> TeacherDayCard(day, engine.lessonsForDay(day, selection)) }
                 } else items(days) { day ->
                     val now = if (todayOnly) LocalTime.now() else null
@@ -448,7 +537,7 @@ private fun PeriodGrid(day: String, rows: List<Pair<com.schoolschedule.app.domai
 }
 
 @Composable
-private fun DayTable(day: String, lessons: List<Lesson>, showGrades: Boolean, now: LocalTime?) = Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+private fun DayTable(day: String, lessons: List<Lesson>, teacher: Boolean, now: LocalTime?) = Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
     Column(Modifier.padding(16.dp)) {
         Text(day, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -457,6 +546,9 @@ private fun DayTable(day: String, lessons: List<Lesson>, showGrades: Boolean, no
         lessons.forEachIndexed { i, lesson ->
             val isCurrent = now != null && !now.isBefore(lesson.period.start) && now.isBefore(lesson.period.end)
             val colors = subjectColor(lesson.subject, dark)
+            // Teachers care most about which class they're walking into; students care about the subject.
+            val primaryText = if (teacher) lesson.grades.joinToString(" + ") else lesson.subject
+            val secondaryText = if (teacher) lesson.subject else null
             Row(
                 Modifier.fillMaxWidth()
                     .background(if (isCurrent) colors.container else Color.Transparent, RoundedCornerShape(12.dp))
@@ -466,8 +558,8 @@ private fun DayTable(day: String, lessons: List<Lesson>, showGrades: Boolean, no
                 PeriodChip(lesson.period.id)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(lesson.subject, fontWeight = FontWeight.Bold, color = if (isCurrent) colors.onContainer else MaterialTheme.colorScheme.onSurface)
-                    if (showGrades) Text(lesson.grades.joinToString(" + "), style = MaterialTheme.typography.bodySmall, color = if (isCurrent) colors.onContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(primaryText, fontWeight = FontWeight.Bold, color = if (isCurrent) colors.onContainer else MaterialTheme.colorScheme.onSurface)
+                    secondaryText?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (isCurrent) colors.onContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 Text("${lesson.period.start}–${lesson.period.end}", style = MaterialTheme.typography.bodySmall, color = if (isCurrent) colors.onContainer else MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -483,39 +575,121 @@ private fun PeriodChip(id: String) = AssistChip(
 )
 
 @Composable
-private fun SettingsScreen(controller: AppController) = Scaffold(topBar = { TitleBar("الإعدادات") }) { padding ->
-    LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { SectionHeader("المظهر") }
-        item {
-            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("وضع الألوان", fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(10.dp))
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected = controller.themeMode == ThemeMode.SYSTEM, onClick = { controller.updateThemeMode(ThemeMode.SYSTEM) }, shape = SegmentedButtonDefaults.itemShape(0, 3), icon = { Icon(Icons.Default.SettingsBrightness, null, modifier = Modifier.size(18.dp)) }) { Text("تلقائي") }
-                        SegmentedButton(selected = controller.themeMode == ThemeMode.LIGHT, onClick = { controller.updateThemeMode(ThemeMode.LIGHT) }, shape = SegmentedButtonDefaults.itemShape(1, 3), icon = { Icon(Icons.Default.LightMode, null, modifier = Modifier.size(18.dp)) }) { Text("فاتح") }
-                        SegmentedButton(selected = controller.themeMode == ThemeMode.DARK, onClick = { controller.updateThemeMode(ThemeMode.DARK) }, shape = SegmentedButtonDefaults.itemShape(2, 3), icon = { Icon(Icons.Default.DarkMode, null, modifier = Modifier.size(18.dp)) }) { Text("داكن") }
+private fun SettingsScreen(controller: AppController) {
+    val holidays = controller.data?.holidays.orEmpty()
+    var showDatePicker by remember { mutableStateOf(false) }
+    // The date currently being edited in the note dialog; null = dialog closed.
+    var editingDate by remember { mutableStateOf<LocalDate?>(null) }
+    var noteDraft by remember { mutableStateOf("") }
+
+    Scaffold(topBar = { TitleBar("الإعدادات") }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item { SectionHeader("المظهر") }
+            item {
+                Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("وضع الألوان", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(10.dp))
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            SegmentedButton(selected = controller.themeMode == ThemeMode.SYSTEM, onClick = { controller.updateThemeMode(ThemeMode.SYSTEM) }, shape = SegmentedButtonDefaults.itemShape(0, 3), icon = { Icon(Icons.Default.SettingsBrightness, null, modifier = Modifier.size(18.dp)) }) { Text("تلقائي") }
+                            SegmentedButton(selected = controller.themeMode == ThemeMode.LIGHT, onClick = { controller.updateThemeMode(ThemeMode.LIGHT) }, shape = SegmentedButtonDefaults.itemShape(1, 3), icon = { Icon(Icons.Default.LightMode, null, modifier = Modifier.size(18.dp)) }) { Text("فاتح") }
+                            SegmentedButton(selected = controller.themeMode == ThemeMode.DARK, onClick = { controller.updateThemeMode(ThemeMode.DARK) }, shape = SegmentedButtonDefaults.itemShape(2, 3), icon = { Icon(Icons.Default.DarkMode, null, modifier = Modifier.size(18.dp)) }) { Text("داكن") }
+                        }
+                    }
+                }
+            }
+            item { SectionHeader("المستخدم") }
+            item { SettingItem(Icons.Default.SwapHoriz, "تغيير نوع المستخدم أو الصف/المادة", controller.selection?.value.orEmpty()) { controller.clearSelection() } }
+            item { SectionHeader("الإشعارات") }
+            item { ToggleItem(Icons.Default.NotificationsActive, "إشعار عند بداية الحصة", controller.notifyStart) { controller.updateNotifications(start = it) } }
+            item { ToggleItem(Icons.Default.NotificationsActive, "إشعار عند نهاية الحصة", controller.notifyEnd) { controller.updateNotifications(end = it) } }
+            item { ToggleItem(Icons.Default.NotificationsActive, "إشعار قبل الحصة بـ5 دقائق", controller.notifyBefore) { controller.updateNotifications(before = it) } }
+
+            item { SectionHeader("العطل") }
+            item {
+                OutlinedButton(
+                    onClick = { editingDate = null; noteDraft = ""; showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
+                ) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(8.dp)); Text("إضافة عطلة") }
+            }
+            if (holidays.isEmpty()) {
+                item { Text("لا توجد عطل مضافة بعد.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 4.dp)) }
+            } else {
+                items(holidays.toSortedMap().entries.toList()) { (date, note) ->
+                    Card(
+                        Modifier.fillMaxWidth().clickable { editingDate = date; noteDraft = note.orEmpty() },
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(arabicDateWithYear(date), fontWeight = FontWeight.Bold)
+                                Text(note?.takeIf { it.isNotBlank() } ?: "عطلة بدون سبب محدد", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { controller.removeHoliday(date) }) { Icon(Icons.Default.Delete, "حذف", tint = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+            }
+
+            item { SectionHeader("البيانات") }
+            item { SettingItem(Icons.Default.Refresh, "إعادة تحميل ملفات البيانات", "لتطبيق تغييرات JSON الخارجية") { controller.reload() } }
+            item { SettingItem(Icons.Default.Restore, "استعادة البيانات الافتراضية", "يستبدل ملفات JSON الحالية") { controller.restore() } }
+            item {
+                Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("مسار ملفات البيانات", fontWeight = FontWeight.Bold)
+                        Text(controller.path(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
-        item { SectionHeader("المستخدم") }
-        item { SettingItem(Icons.Default.SwapHoriz, "تغيير نوع المستخدم أو الصف/المادة", controller.selection?.value.orEmpty()) { controller.clearSelection() } }
-        item { SectionHeader("الإشعارات") }
-        item { ToggleItem(Icons.Default.NotificationsActive, "إشعار عند بداية الحصة", controller.notifyStart) { controller.updateNotifications(start = it) } }
-        item { ToggleItem(Icons.Default.NotificationsActive, "إشعار عند نهاية الحصة", controller.notifyEnd) { controller.updateNotifications(end = it) } }
-        item { ToggleItem(Icons.Default.NotificationsActive, "إشعار قبل الحصة بـ5 دقائق", controller.notifyBefore) { controller.updateNotifications(before = it) } }
-        item { SectionHeader("البيانات") }
-        item { SettingItem(Icons.Default.Refresh, "إعادة تحميل ملفات البيانات", "لتطبيق تغييرات JSON الخارجية") { controller.reload() } }
-        item { SettingItem(Icons.Default.Restore, "استعادة البيانات الافتراضية", "يستبدل ملفات JSON الحالية") { controller.restore() } }
-        item {
-            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("مسار ملفات البيانات", fontWeight = FontWeight.Bold)
-                    Text(controller.path(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+
+    if (showDatePicker) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = state.selectedDateMillis
+                    if (millis != null) {
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        editingDate = picked
+                        noteDraft = holidays[picked].orEmpty()
+                    }
+                    showDatePicker = false
+                }) { Text("التالي") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") } },
+        ) { DatePicker(state = state) }
+    }
+
+    editingDate?.let { date ->
+        val isExisting = holidays.containsKey(date)
+        AlertDialog(
+            onDismissRequest = { editingDate = null },
+            title = { Text(if (isExisting) "تعديل العطلة" else "إضافة عطلة") },
+            text = {
+                Column {
+                    Text(arabicDateWithYear(date), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = noteDraft, onValueChange = { noteDraft = it },
+                        label = { Text("السبب (اختياري)") }, placeholder = { Text("مثلًا: عطلة بمناسبة يوم العمال العالمي") },
+                        modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
+                    )
                 }
-            }
-        }
+            },
+            confirmButton = {
+                TextButton(onClick = { controller.saveHoliday(date, noteDraft, previousDate = date); editingDate = null }) { Text("حفظ") }
+            },
+            dismissButton = {
+                Row {
+                    if (isExisting) TextButton(onClick = { controller.removeHoliday(date); editingDate = null }) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+                    TextButton(onClick = { editingDate = null }) { Text("إلغاء") }
+                }
+            },
+        )
     }
 }
 
@@ -573,4 +747,6 @@ private fun EmptyCard(text: String) = Card(Modifier.fillMaxWidth(), shape = Mate
 private fun TitleBar(title: String, action: @Composable (() -> Unit)? = null) = CenterAlignedTopAppBar(title = { Text(title, fontWeight = FontWeight.Bold) }, actions = { action?.invoke() }, colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface))
 
 private fun formatDuration(seconds: Long): String { val m = seconds / 60; val s = seconds % 60; return if (m > 0) "$m دقيقة${if (s > 0) " و$s ثانية" else ""}" else "$s ثانية" }
-private fun arabicDate(date: LocalDate): String { val months = listOf("", "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران", "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول"); return "${date.dayOfMonth} ${months[date.monthValue]}" }
+private val arabicMonths = listOf("", "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران", "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول")
+private fun arabicDate(date: LocalDate): String = "${date.dayOfMonth} ${arabicMonths[date.monthValue]}"
+private fun arabicDateWithYear(date: LocalDate): String = "${date.dayOfMonth} ${arabicMonths[date.monthValue]} ${date.year}"

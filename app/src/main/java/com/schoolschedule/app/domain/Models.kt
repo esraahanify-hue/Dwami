@@ -12,7 +12,8 @@ data class Period(val id: String, val start: LocalTime, val end: LocalTime)
 data class ScheduleData(
     val schedule: Map<String, Map<String, List<String>>>,
     val periods: List<Period>,
-    val holidays: Set<LocalDate>
+    /** Date -> optional reason/note for the holiday (null or blank = no note). */
+    val holidays: Map<LocalDate, String?>
 )
 
 data class Lesson(
@@ -22,7 +23,9 @@ data class Lesson(
 )
 
 sealed interface DayStatus {
-    data object Holiday : DayStatus
+    data class Holiday(val note: String?) : DayStatus
+    /** Not a calendar holiday, but this person has zero periods today (e.g. a teacher whose subject isn't taught that day). */
+    data object NoLessonsToday : DayStatus
     data object Finished : DayStatus
     data class BeforeStart(val next: Lesson) : DayStatus
     data class InLesson(val current: Lesson, val remainingSeconds: Long, val next: Lesson?) : DayStatus

@@ -88,11 +88,34 @@ class StorageRepository(private val context: Context) {
         }
     } catch (e: Exception) { errors += "تعذر قراءة periods.json. تحقق من صحة الملف."; null }
 
-    private fun readHolidays(errors: MutableList<String>): Set<LocalDate>? = try {
+    // Each holiday entry is either a plain "YYYY-MM-DD" string, or an object
+    // {"date": "YYYY-MM-DD", "note": "..."} carrying an optional reason.
+    private fun readHolidays(errors: MutableList<String>): Map<LocalDate, String?>? = try {
         val root = JSONObject(text("holidays.json", errors) ?: return null)
         val list: JSONArray = root.optJSONArray("holidays") ?: JSONArray()
-        buildSet { for (i in 0 until list.length()) add(LocalDate.parse(list.getString(i))) }
+        buildMap {
+            for (i in 0 until list.length()) {
+                val entry = list.get(i)
+                if (entry is JSONObject) {
+                    put(LocalDate.parse(entry.getString("date")), entry.optString("note", "").takeIf { it.isNotBlank() })
+                } else {
+                    put(LocalDate.parse(entry.toString()), null)
+                }
+            }
+        }
     } catch (e: Exception) { errors += "تعذر قراءة holidays.json. استخدم تاريخ YYYY-MM-DD."; null }
+
+    fun saveHolidays(holidays: Map<LocalDate, String?>): Boolean = try {
+        val array = JSONArray()
+        holidays.toSortedMap().forEach { (date, note) ->
+            if (note.isNullOrBlank()) array.put(date.toString())
+            else array.put(JSONObject().put("date", date.toString()).put("note", note))
+        }
+        val root = JSONObject().put("holidays", array)
+        if (!dataDir.exists()) dataDir.mkdirs()
+        File(dataDir, "holidays.json").writeText(root.toString(2), Charsets.UTF_8)
+        true
+    } catch (e: Exception) { false }
 }
 
 private fun <T> java.util.Iterator<T>.asSequence(): Sequence<T> = sequence { while (hasNext()) yield(next()) }

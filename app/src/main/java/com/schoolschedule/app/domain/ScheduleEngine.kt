@@ -12,7 +12,8 @@ class ScheduleEngine(private val data: ScheduleData) {
         DayOfWeek.WEDNESDAY -> "الأربعاء"; DayOfWeek.THURSDAY -> "الخميس"; DayOfWeek.FRIDAY -> "الجمعة"; DayOfWeek.SATURDAY -> "السبت"
     }
 
-    fun isHoliday(date: LocalDate): Boolean = date in data.holidays || date.dayOfWeek in setOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY)
+    fun isHoliday(date: LocalDate): Boolean = date in data.holidays.keys || date.dayOfWeek in setOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY)
+    fun holidayNote(date: LocalDate): String? = data.holidays[date]?.trim()?.takeIf { it.isNotEmpty() }
 
     fun grades(): List<String> = data.schedule.values.flatMap { it.keys }.distinct().sorted()
     fun subjects(): List<String> = data.schedule.values.flatMap { day -> day.values.flatten() }.filter(::isLesson).distinct().sorted()
@@ -47,8 +48,9 @@ class ScheduleEngine(private val data: ScheduleData) {
 
     fun status(now: LocalDateTime, selection: UserSelection): DayStatus {
         val date = now.toLocalDate()
-        if (isHoliday(date)) return DayStatus.Holiday
+        if (isHoliday(date)) return DayStatus.Holiday(holidayNote(date))
         val lessons = lessonsFor(date, selection)
+        if (lessons.isEmpty()) return DayStatus.NoLessonsToday
         val time = now.toLocalTime()
         val current = lessons.firstOrNull { !time.isBefore(it.period.start) && time.isBefore(it.period.end) }
         if (current != null) {

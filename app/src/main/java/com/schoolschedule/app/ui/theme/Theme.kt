@@ -23,55 +23,57 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-// Brand palette: deep school-blue + warm teal accent, tuned for a calm, modern look.
-private val SeedBlue = Color(0xFF2C5F8A)
-private val SeedTeal = Color(0xFF3E7D6E)
-private val SeedAmber = Color(0xFFB0631F)
+// Brand palette lifted straight from the "دوامي" logo: sky-blue building card,
+// warm orange backpack/roof, golden bell/pencil accent. Bright and lively on purpose.
+val LogoSkyBlue = Color(0xFF29ABE2)
+val LogoDeepBlue = Color(0xFF1B5FA8)
+val LogoOrange = Color(0xFFF2994A)
+val LogoGold = Color(0xFFF4B400)
 
 val LightColors = lightColorScheme(
-    primary = Color(0xFF265C87),
+    primary = Color(0xFF166DB0),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD3E4FA),
-    onPrimaryContainer = Color(0xFF08304F),
-    secondary = SeedTeal,
+    primaryContainer = Color(0xFFC9E9FB),
+    onPrimaryContainer = Color(0xFF063A5E),
+    secondary = Color(0xFFE07A1F),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD7ECE3),
-    onSecondaryContainer = Color(0xFF0E2F26),
-    tertiary = SeedAmber,
+    secondaryContainer = Color(0xFFFFDFB8),
+    onSecondaryContainer = Color(0xFF4A2705),
+    tertiary = Color(0xFFAD7F00),
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFFBE2C6),
-    onTertiaryContainer = Color(0xFF3E2405),
-    background = Color(0xFFF7F9FC),
-    onBackground = Color(0xFF1B1E22),
-    surface = Color(0xFFFCFCFF),
-    onSurface = Color(0xFF1B1E22),
-    surfaceVariant = Color(0xFFE7EDF5),
-    onSurfaceVariant = Color(0xFF44474D),
-    outline = Color(0xFF767A82),
+    tertiaryContainer = Color(0xFFFFECAD),
+    onTertiaryContainer = Color(0xFF3F2E00),
+    background = Color(0xFFF6FAFD),
+    onBackground = Color(0xFF191C1F),
+    surface = Color(0xFFFCFEFF),
+    onSurface = Color(0xFF191C1F),
+    surfaceVariant = Color(0xFFE3EFF6),
+    onSurfaceVariant = Color(0xFF41484D),
+    outline = Color(0xFF74797D),
     error = Color(0xFFBA1A1A),
     onError = Color.White,
 )
 
 val DarkColors = darkColorScheme(
-    primary = Color(0xFF9FCBFA),
-    onPrimary = Color(0xFF0A3355),
-    primaryContainer = Color(0xFF17456A),
-    onPrimaryContainer = Color(0xFFD3E4FA),
-    secondary = Color(0xFF9FD4C3),
-    onSecondary = Color(0xFF0A3327),
-    secondaryContainer = Color(0xFF224A3D),
-    onSecondaryContainer = Color(0xFFD7ECE3),
-    tertiary = Color(0xFFF3BE8B),
-    onTertiary = Color(0xFF432B03),
-    tertiaryContainer = Color(0xFF5E3E10),
-    onTertiaryContainer = Color(0xFFFBE2C6),
-    background = Color(0xFF12151A),
-    onBackground = Color(0xFFE3E2E6),
-    surface = Color(0xFF181B20),
-    onSurface = Color(0xFFE3E2E6),
-    surfaceVariant = Color(0xFF262A30),
-    onSurfaceVariant = Color(0xFFC4C7CE),
-    outline = Color(0xFF8E9198),
+    primary = Color(0xFF8FCEF2),
+    onPrimary = Color(0xFF00344F),
+    primaryContainer = Color(0xFF104E77),
+    onPrimaryContainer = Color(0xFFC9E9FB),
+    secondary = Color(0xFFFFB874),
+    onSecondary = Color(0xFF4A2705),
+    secondaryContainer = Color(0xFF6A3C0D),
+    onSecondaryContainer = Color(0xFFFFDFB8),
+    tertiary = Color(0xFFEFC846),
+    onTertiary = Color(0xFF3F2E00),
+    tertiaryContainer = Color(0xFF5A4300),
+    onTertiaryContainer = Color(0xFFFFECAD),
+    background = Color(0xFF10151A),
+    onBackground = Color(0xFFE2E5E8),
+    surface = Color(0xFF161C21),
+    onSurface = Color(0xFFE2E5E8),
+    surfaceVariant = Color(0xFF252E34),
+    onSurfaceVariant = Color(0xFFC1C9CE),
+    outline = Color(0xFF8B9297),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
 )

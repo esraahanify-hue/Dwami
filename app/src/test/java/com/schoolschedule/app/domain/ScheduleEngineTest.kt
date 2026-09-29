@@ -14,7 +14,7 @@ class ScheduleEngineTest {
             "ثامن" to listOf("عربي", "علوم")
         )),
         periods = listOf(Period("1", LocalTime.of(7,30), LocalTime.of(8,10)), Period("2", LocalTime.of(8,20), LocalTime.of(9,0))),
-        holidays = setOf(LocalDate.of(2026, 4, 12))
+        holidays = mapOf(LocalDate.of(2026, 4, 12) to "عطلة بمناسبة يوم العمال العالمي")
     ))
 
     @Test fun `teacher matches merge grades in same period`() {
@@ -31,7 +31,12 @@ class ScheduleEngineTest {
 
     @Test fun `exceptional holiday supersedes active day`() {
         val state = engine.status(LocalDateTime.of(2026, 4, 12, 7, 40), UserSelection(UserRole.STUDENT, "سابع بنات"))
-        assertEquals(DayStatus.Holiday, state)
+        assertTrue(state is DayStatus.Holiday && state.note == "عطلة بمناسبة يوم العمال العالمي")
+    }
+
+    @Test fun `teacher with no lessons that day gets NoLessonsToday`() {
+        val state = engine.status(LocalDateTime.of(2026, 3, 2, 8, 0), UserSelection(UserRole.TEACHER, "رياضيات"))
+        assertEquals(DayStatus.NoLessonsToday, state)
     }
 
     @Test fun `break shows next lesson`() {
