@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBrightness
@@ -115,7 +117,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 
-enum class Screen { HOME, TODAY, TOMORROW, FULL, SETTINGS }
+enum class Screen { HOME, TODAY, TOMORROW, FULL, SETTINGS, NOTIFICATION_LAB }
 
 class AppController(private val context: Context) {
     private val repository = StorageRepository(context)
@@ -255,9 +257,13 @@ private val bottomDestinations = listOf(
 
 @Composable
 private fun MainScaffold(controller: AppController) {
+    // The Notification Lab is a secondary/diagnostic screen reached from
+    // Settings, not a primary destination — it hides the bottom bar and gets
+    // its own back arrow instead, like a normal "sub-page".
+    val isSubScreen = controller.screen == Screen.NOTIFICATION_LAB
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            if (!isSubScreen) NavigationBar {
                 bottomDestinations.forEach { (screen, label, icon) ->
                     NavigationBarItem(
                         selected = controller.screen == screen,
@@ -282,6 +288,7 @@ private fun MainScaffold(controller: AppController) {
                     Screen.TOMORROW -> DayAheadScreen(controller)
                     Screen.FULL -> TableScreen(controller, todayOnly = false)
                     Screen.SETTINGS -> SettingsScreen(controller)
+                    Screen.NOTIFICATION_LAB -> NotificationLabScreen(controller) { controller.screen = Screen.SETTINGS }
                 }
             }
         }
@@ -604,6 +611,7 @@ private fun SettingsScreen(controller: AppController) {
             item { ToggleItem(Icons.Default.NotificationsActive, "إشعار عند بداية الحصة", controller.notifyStart) { controller.updateNotifications(start = it) } }
             item { ToggleItem(Icons.Default.NotificationsActive, "إشعار عند نهاية الحصة", controller.notifyEnd) { controller.updateNotifications(end = it) } }
             item { ToggleItem(Icons.Default.NotificationsActive, "إشعار قبل الحصة بـ5 دقائق", controller.notifyBefore) { controller.updateNotifications(before = it) } }
+            item { SettingItem(Icons.Default.Science, "اختبار الإشعارات", "جدول تنبيهات تجريبية وسجّل الفرق الزمني بدقة") { controller.screen = Screen.NOTIFICATION_LAB } }
 
             item { SectionHeader("العطل") }
             item {
@@ -744,7 +752,14 @@ private fun EmptyCard(text: String) = Card(Modifier.fillMaxWidth(), shape = Mate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TitleBar(title: String, action: @Composable (() -> Unit)? = null) = CenterAlignedTopAppBar(title = { Text(title, fontWeight = FontWeight.Bold) }, actions = { action?.invoke() }, colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface))
+internal fun TitleBar(title: String, action: @Composable (() -> Unit)? = null, onBack: (() -> Unit)? = null) = CenterAlignedTopAppBar(
+    title = { Text(title, fontWeight = FontWeight.Bold) },
+    navigationIcon = {
+        if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
+    },
+    actions = { action?.invoke() },
+    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+)
 
 private fun formatDuration(seconds: Long): String { val m = seconds / 60; val s = seconds % 60; return if (m > 0) "$m دقيقة${if (s > 0) " و$s ثانية" else ""}" else "$s ثانية" }
 private val arabicMonths = listOf("", "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران", "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول")

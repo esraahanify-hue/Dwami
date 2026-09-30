@@ -9,6 +9,7 @@ import com.schoolschedule.app.data.AppPreferences
 import com.schoolschedule.app.data.StorageRepository
 import com.schoolschedule.app.domain.Lesson
 import com.schoolschedule.app.domain.ScheduleEngine
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -17,7 +18,27 @@ object NotificationScheduler {
     const val CHANNEL_ID = "class_notifications"
     const val ACTION_NOTIFY = "com.schoolschedule.app.NOTIFY"
     const val ACTION_REFRESH = "com.schoolschedule.app.REFRESH_ALARMS"
+    const val ACTION_TEST = "com.schoolschedule.app.TEST_NOTIFY"
     private const val DAYS_AHEAD = 14
+
+    // Test notifications live outside the normal reschedule/cancelAll bookkeeping
+    // (they're one-offs the user schedules by hand from the Notification Lab).
+    fun scheduleTest(context: Context, id: String, label: String, atMillis: Long) {
+        val intent = Intent(context, AlarmReceiver::class.java).setAction(ACTION_TEST)
+            .putExtra("testId", id)
+            .putExtra("label", label)
+            .putExtra("scheduledAtMillis", atMillis)
+        val pi = PendingIntent.getBroadcast(context, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        setAlarm(context, LocalDateTime.ofInstant(Instant.ofEpochMilli(atMillis), ZoneId.systemDefault()), pi)
+    }
+
+    fun cancelTest(context: Context, id: String) {
+        val intent = Intent(context, AlarmReceiver::class.java).setAction(ACTION_TEST)
+        val flags = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        PendingIntent.getBroadcast(context, id.hashCode(), intent, flags)?.let {
+            context.getSystemService(AlarmManager::class.java).cancel(it)
+        }
+    }
 
     fun reschedule(context: Context) {
         val prefs = AppPreferences(context)

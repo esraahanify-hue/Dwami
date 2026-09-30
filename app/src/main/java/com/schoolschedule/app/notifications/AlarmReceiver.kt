@@ -8,11 +8,16 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.schoolschedule.app.R
+import com.schoolschedule.app.data.NotificationTestStore
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == NotificationScheduler.ACTION_REFRESH) {
             NotificationScheduler.reschedule(context)
+            return
+        }
+        if (intent.action == NotificationScheduler.ACTION_TEST) {
+            handleTest(context, intent)
             return
         }
         ensureChannel(context)
@@ -25,6 +30,28 @@ class AlarmReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .build()
         context.getSystemService(NotificationManager::class.java).notify(intent.getIntExtra("id", 1), notification)
+    }
+
+    // Records exactly when this fired (vs. when it was scheduled for) into the
+    // diagnostic log, then shows a small confirmation so the user gets instant
+    // feedback without having to reopen the Notification Lab.
+    private fun handleTest(context: Context, intent: Intent) {
+        val testId = intent.getStringExtra("testId") ?: return
+        val label = intent.getStringExtra("label") ?: "اختبار"
+        val scheduledAtMillis = intent.getLongExtra("scheduledAtMillis", System.currentTimeMillis())
+        val deliveredAtMillis = System.currentTimeMillis()
+        NotificationTestStore.recordDelivery(context, testId, label, scheduledAtMillis)
+        ensureChannel(context)
+        val deltaSeconds = (deliveredAtMillis - scheduledAtMillis) / 1000
+        val body = if (deltaSeconds <= 2) "وصل بالوقت تمامًا ✅" else "تأخر عن الموعد بـ $deltaSeconds ثانية"
+        val notification = NotificationCompat.Builder(context, NotificationScheduler.CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("🧪 نتيجة اختبار: $label")
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+        context.getSystemService(NotificationManager::class.java).notify(testId.hashCode(), notification)
     }
 
     companion object {
