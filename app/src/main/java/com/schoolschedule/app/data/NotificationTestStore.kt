@@ -84,7 +84,7 @@ object NotificationTestStore {
 
     fun readLog(): List<NotificationTestLogEntry> = try {
         val file = logFile()
-        if (!file.exists()) return emptyList()
+        if (!file.exists()) throw java.io.FileNotFoundException()
         val array = JSONArray(file.readText(Charsets.UTF_8))
         List(array.length()) { i ->
             val o = array.getJSONObject(i)

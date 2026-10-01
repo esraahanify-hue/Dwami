@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+
 package com.schoolschedule.app.ui.theme
 
 import android.app.Activity
