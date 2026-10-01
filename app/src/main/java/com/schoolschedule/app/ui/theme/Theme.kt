@@ -18,10 +18,14 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.schoolschedule.app.R
 
 // Brand palette lifted straight from the "دوامي" logo: sky-blue building card,
 // warm orange backpack/roof, golden bell/pencil accent. Bright and lively on purpose.
@@ -86,12 +90,24 @@ val AppShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp),
 )
 
+// Bundled as a single variable font file (res/font/cairo.ttf, wght+slnt axes);
+// each weight below dials in the actual variable-font instance rather than
+// relying on separate static files or a runtime font-provider download.
+val CairoFontFamily = FontFamily(
+    Font(R.font.cairo, weight = FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+    Font(R.font.cairo, weight = FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
+    Font(R.font.cairo, weight = FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
+    Font(R.font.cairo, weight = FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+)
+
 val AppTypography = Typography().let { base ->
     base.copy(
-        headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.Bold),
-        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.Bold),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.2.sp),
+        headlineLarge = base.headlineLarge.copy(fontFamily = CairoFontFamily, fontWeight = FontWeight.Bold),
+        headlineMedium = base.headlineMedium.copy(fontFamily = CairoFontFamily, fontWeight = FontWeight.Bold),
+        headlineSmall = base.headlineSmall.copy(fontFamily = CairoFontFamily, fontWeight = FontWeight.Bold),
+        titleLarge = base.titleLarge.copy(fontFamily = CairoFontFamily, fontWeight = FontWeight.Bold),
+        titleMedium = base.titleMedium.copy(fontFamily = CairoFontFamily, fontWeight = FontWeight.SemiBold),
+        labelLarge = base.labelLarge.copy(fontFamily = CairoFontFamily, fontWeight = FontWeight.SemiBold, letterSpacing = 0.2.sp),
     )
 }
 

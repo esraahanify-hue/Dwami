@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Divider
@@ -90,9 +92,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.schoolschedule.app.R
 import com.schoolschedule.app.data.AppPreferences
 import com.schoolschedule.app.data.StorageRepository
 import com.schoolschedule.app.domain.DataLoadResult
@@ -386,10 +391,20 @@ private fun DayAheadScreen(controller: AppController) {
 @Composable
 private fun StatusMessageCard(title: String, subtitle: String, offDay: Boolean) {
     val brush = if (offDay) Brush.linearGradient(listOf(LogoGold, LogoOrange)) else Brush.linearGradient(listOf(LogoSkyBlue, LogoDeepBlue))
-    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(brush).padding(20.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(subtitle, color = Color.White.copy(alpha = 0.92f))
+    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(brush)) {
+        Image(
+            painter = painterResource(R.drawable.pattern_decoration), contentDescription = null,
+            modifier = Modifier.matchParentSize(), alpha = 0.16f, contentScale = ContentScale.Crop,
+        )
+        Column(Modifier.padding(20.dp), horizontalAlignment = if (offDay) Alignment.CenterHorizontally else Alignment.Start, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (offDay) {
+                Image(
+                    painter = painterResource(R.drawable.day_off_illustration), contentDescription = null,
+                    modifier = Modifier.size(120.dp),
+                )
+            }
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White, textAlign = if (offDay) TextAlign.Center else TextAlign.Start)
+            Text(subtitle, color = Color.White.copy(alpha = 0.92f), textAlign = if (offDay) TextAlign.Center else TextAlign.Start)
         }
     }
 }
@@ -409,16 +424,24 @@ private fun CurrentStatusCard(status: DayStatus, teacher: Boolean) {
     val isOffDay = status is DayStatus.Holiday || status is DayStatus.NoLessonsToday
     val brush = if (isOffDay) Brush.linearGradient(listOf(LogoGold, LogoOrange)) else Brush.linearGradient(listOf(LogoSkyBlue, LogoDeepBlue))
     val onColor = Color.White
-    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(brush).padding(20.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(brush)) {
+        Image(
+            painter = painterResource(R.drawable.pattern_decoration), contentDescription = null,
+            modifier = Modifier.matchParentSize(), alpha = 0.16f, contentScale = ContentScale.Crop,
+        )
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when (status) {
                 is DayStatus.Holiday -> {
                     Text("اليوم عطلة 🌤️", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
                     Text(status.note ?: "الجمعة والسبت والعطل الاستثنائية لا تحتوي على حصص.", color = onColor.copy(alpha = 0.92f))
                 }
                 DayStatus.NoLessonsToday -> if (teacher) {
-                    Text("اليوم عطلتك المميزة 🎉", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
-                    Text("استمتع بوقت فراغك", color = onColor.copy(alpha = 0.92f))
+                    Image(
+                        painter = painterResource(R.drawable.day_off_illustration), contentDescription = null,
+                        modifier = Modifier.size(120.dp).align(Alignment.CenterHorizontally),
+                    )
+                    Text("اليوم عطلتك المميزة 🎉", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    Text("استمتع بوقت فراغك", color = onColor.copy(alpha = 0.92f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 } else {
                     Text("لا توجد لديك حصص اليوم", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onColor)
                 }
@@ -439,11 +462,20 @@ private fun CurrentStatusCard(status: DayStatus, teacher: Boolean) {
                     LessonDetails(status.current, teacher, onColor, prominent = true)
                     val totalSeconds = java.time.Duration.between(status.current.period.start, status.current.period.end).seconds.coerceAtLeast(1)
                     val progress = (1f - status.remainingSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
-                    LinearProgressIndicator(
-                        progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)),
-                        color = onColor, trackColor = onColor.copy(alpha = 0.28f),
-                    )
-                    Text("باقي ${formatDuration(status.remainingSeconds)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = onColor)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // A clock-face ring, echoing the clock in the app logo, instead of a plain bar.
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(76.dp)) {
+                            CircularProgressIndicator(
+                                progress = { progress }, modifier = Modifier.fillMaxSize(), strokeWidth = 7.dp,
+                                color = onColor, trackColor = onColor.copy(alpha = 0.25f),
+                            )
+                            Text(formatDurationCompact(status.remainingSeconds), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColor)
+                        }
+                        Column {
+                            Text("باقٍ على نهاية الحصة", color = onColor.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                            Text(formatDuration(status.remainingSeconds), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = onColor)
+                        }
+                    }
                     Divider(Modifier.padding(vertical = 4.dp), color = onColor.copy(alpha = 0.3f))
                     Text("الحصة القادمة", style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.85f))
                     status.next?.let { NextLesson(it, it.period.start, null, teacher, onColor) } ?: Text("لا توجد حصة قادمة اليوم", color = onColor)
@@ -762,6 +794,8 @@ internal fun TitleBar(title: String, action: @Composable (() -> Unit)? = null, o
 )
 
 private fun formatDuration(seconds: Long): String { val m = seconds / 60; val s = seconds % 60; return if (m > 0) "$m دقيقة${if (s > 0) " و$s ثانية" else ""}" else "$s ثانية" }
+// Compact "MM:SS" for inside the small progress ring, where a full sentence won't fit.
+private fun formatDurationCompact(seconds: Long): String { val m = seconds / 60; val s = seconds % 60; return "%d:%02d".format(m, s) }
 private val arabicMonths = listOf("", "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران", "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول")
 private fun arabicDate(date: LocalDate): String = "${date.dayOfMonth} ${arabicMonths[date.monthValue]}"
 private fun arabicDateWithYear(date: LocalDate): String = "${date.dayOfMonth} ${arabicMonths[date.monthValue]} ${date.year}"
