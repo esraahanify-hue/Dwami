@@ -103,7 +103,7 @@ fun NotificationLabScreen(controller: AppController, onBack: () -> Unit) {
         LazyColumn(Modifier.fillMaxWidth().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             item {
                 Text(
-                    "جدول تنبيهًا تجريبيًا واترك الشاشة أو أغلق التطبيق. وقت الجدولة ووقت الوصول الفعلي يُسجَّلان تلقائيًا بدقة الثانية.",
+                    "جدول تنبيهًا تجريبيًا، أو راقب السجل بالأسفل — فيه الآن كل إشعارات الدوام الحقيقية تلقائيًا كمان (بداية/نهاية/قبل 5 دقائق)، مو بس الاختبارات. وقت الجدولة ووقت الوصول الفعلي يُسجَّلان بدقة الثانية لكل إشعار.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -207,7 +207,12 @@ private fun LogRow(entry: NotificationTestLogEntry) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Icon(Icons.Default.CheckCircle, null, tint = deltaColor, modifier = Modifier.height(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(entry.label, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                AssistChip(
+                    onClick = {}, label = { Text(if (entry.isTest) "اختبار" else "حقيقي", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.height(24.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(entry.label, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
                 Text(
                     if (delta < 60) "+${delta}ث" else "+${delta / 60}د ${delta % 60}ث",
                     fontWeight = FontWeight.Bold, color = deltaColor,

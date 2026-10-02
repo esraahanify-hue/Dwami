@@ -21,6 +21,8 @@ data class NotificationTestLogEntry(
     val androidSdkInt: Int,
     val batteryOptimizationIgnored: Boolean,
     val canScheduleExactAlarms: Boolean,
+    /** true = scheduled by hand from the Notification Lab; false = a real class notification (start/end/before). */
+    val isTest: Boolean = true,
 ) {
     val deltaSeconds: Long get() = (deliveredAtMillis - scheduledAtMillis) / 1000
 }
@@ -64,9 +66,9 @@ object NotificationTestStore {
         savePending(context, pending(context).filterNot { it.id == id })
     }
 
-    /** Called from AlarmReceiver the instant a test alarm actually fires. */
-    fun recordDelivery(context: Context, id: String, label: String, scheduledAtMillis: Long) {
-        removePending(context, id)
+    /** Called from AlarmReceiver the instant any alarm actually fires — test or real. */
+    fun recordDelivery(context: Context, id: String, label: String, scheduledAtMillis: Long, isTest: Boolean) {
+        if (isTest) removePending(context, id)
         val deliveredAtMillis = System.currentTimeMillis()
         val powerManager = context.getSystemService(PowerManager::class.java)
         val batteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
@@ -78,8 +80,11 @@ object NotificationTestStore {
             deviceManufacturer = Build.MANUFACTURER ?: "", deviceModel = Build.MODEL ?: "",
             androidRelease = Build.VERSION.RELEASE ?: "", androidSdkInt = Build.VERSION.SDK_INT,
             batteryOptimizationIgnored = batteryOptimizationIgnored, canScheduleExactAlarms = canExact,
+            isTest = isTest,
         )
-        writeLog(listOf(entry) + readLog())
+        // Keep the file from growing forever: real notifications fire constantly,
+        // so cap the log at the most recent 200 entries.
+        writeLog((listOf(entry) + readLog()).take(200))
     }
 
     fun readLog(): List<NotificationTestLogEntry> = try {
@@ -95,6 +100,7 @@ object NotificationTestStore {
                 androidRelease = o.optString("androidRelease", ""), androidSdkInt = o.optInt("androidSdkInt", 0),
                 batteryOptimizationIgnored = o.optBoolean("batteryOptimizationIgnored", false),
                 canScheduleExactAlarms = o.optBoolean("canScheduleExactAlarms", false),
+                isTest = o.optBoolean("isTest", true),
             )
         }
     } catch (e: Exception) { emptyList() }
@@ -112,7 +118,8 @@ object NotificationTestStore {
                         .put("deviceManufacturer", e.deviceManufacturer).put("deviceModel", e.deviceModel)
                         .put("androidRelease", e.androidRelease).put("androidSdkInt", e.androidSdkInt)
                         .put("batteryOptimizationIgnored", e.batteryOptimizationIgnored)
-                        .put("canScheduleExactAlarms", e.canScheduleExactAlarms),
+                        .put("canScheduleExactAlarms", e.canScheduleExactAlarms)
+                        .put("isTest", e.isTest),
                 )
             }
             file.writeText(array.toString(2), Charsets.UTF_8)

@@ -84,10 +84,12 @@ object NotificationScheduler {
             else -> "انتهت الحصة ${lesson.period.id}"
         }
         val target = "$title — ${lesson.subject}" + if (lesson.grades.size > 1) " (${lesson.grades.joinToString(" + ")})" else if (lesson.grades.isNotEmpty()) " (${lesson.grades.first()})" else ""
+        val scheduledAtMillis = at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val intent = Intent(context, AlarmReceiver::class.java).setAction(ACTION_NOTIFY)
             .putExtra("title", if (type == "end") "انتهت الحصة" else "تنبيه الدوام")
             .putExtra("message", target)
             .putExtra("id", token.hashCode())
+            .putExtra("scheduledAtMillis", scheduledAtMillis)
         val pi = PendingIntent.getBroadcast(context, token.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         setAlarm(context, at, pi)
         ids += "${token.hashCode()}|notify"

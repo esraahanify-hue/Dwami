@@ -115,6 +115,7 @@ import com.schoolschedule.app.ui.theme.LogoSkyBlue
 import com.schoolschedule.app.ui.theme.SchoolScheduleTheme
 import com.schoolschedule.app.ui.theme.ThemeMode
 import com.schoolschedule.app.ui.theme.subjectColor
+import com.schoolschedule.app.ui.theme.subjectIconRes
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
@@ -241,7 +242,11 @@ private fun SetupScreen(controller: AppController) {
                 }
                 val filtered = values.filter { it.contains(query.trim(), ignoreCase = true) }
                 items(filtered) { value ->
-                    OptionCard(value, if (role == UserRole.STUDENT) "عرض جدول $value" else "برنامج مادة $value", if (role == UserRole.STUDENT) Icons.Default.School else Icons.Default.Person) {
+                    OptionCard(
+                        value, if (role == UserRole.STUDENT) "عرض جدول $value" else "برنامج مادة $value",
+                        if (role == UserRole.STUDENT) Icons.Default.School else Icons.Default.Person,
+                        subjectForIcon = if (role == UserRole.TEACHER) value else null,
+                    ) {
                         controller.saveSelection(UserSelection(requireNotNull(role), value))
                     }
                 }
@@ -349,6 +354,8 @@ private fun DayTimeline(lessons: List<Lesson>, now: LocalTime, teacher: Boolean)
                             "الحصة ${lesson.period.id}", style = MaterialTheme.typography.labelSmall,
                             color = if (isCurrent) MaterialTheme.colorScheme.onPrimary else colors.onContainer,
                         )
+                        Spacer(Modifier.weight(1f))
+                        SubjectIcon(lesson.subject, 20.dp)
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -496,11 +503,16 @@ private fun NextLesson(lesson: Lesson, starts: LocalTime, remaining: Long?, teac
 // (they already know what they teach) — so it's shown as the headline, with
 // the subject as supporting detail. For a student it's the other way round.
 @Composable
-private fun LessonDetails(lesson: Lesson, teacher: Boolean, contentColor: Color, prominent: Boolean = false) = Column {
+private fun LessonDetails(lesson: Lesson, teacher: Boolean, contentColor: Color, prominent: Boolean = false) {
     val headline = if (teacher) lesson.grades.joinToString(" + ") else lesson.subject
     val secondary = if (teacher) "${lesson.subject} — الحصة ${lesson.period.id}" else "الحصة ${lesson.period.id}"
-    Text(headline, style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
-    Text(secondary, color = contentColor.copy(alpha = 0.9f))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SubjectIcon(lesson.subject, if (prominent) 40.dp else 30.dp)
+        Column {
+            Text(headline, style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
+            Text(secondary, color = contentColor.copy(alpha = 0.9f))
+        }
+    }
 }
 
 @Composable
@@ -538,7 +550,10 @@ private fun TableScreen(controller: AppController, todayOnly: Boolean) {
 @Composable
 private fun TeacherDayCard(day: String, lessons: List<Lesson>) = Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
     Column(Modifier.padding(16.dp)) {
-        Text(day, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(day, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            lessons.firstOrNull()?.let { SubjectIcon(it.subject, 28.dp) }
+        }
         Spacer(Modifier.height(8.dp))
         if (lessons.isEmpty()) Text("لا توجد حصة للمادة", color = MaterialTheme.colorScheme.onSurfaceVariant)
         lessons.forEach { lesson ->
@@ -564,7 +579,10 @@ private fun PeriodGrid(day: String, rows: List<Pair<com.schoolschedule.app.domai
                 Column(Modifier.weight(1f)) {
                     if (lessons.isEmpty()) Text("لا توجد حصة", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     else lessons.groupBy { it.subject }.forEach { (subject, subjectLessons) ->
-                        Text(subject, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SubjectIcon(subject, 20.dp)
+                            Text(subject, fontWeight = FontWeight.Bold)
+                        }
                         Text(subjectLessons.joinToString(" + ") { it.grades.first() }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -596,6 +614,8 @@ private fun DayTable(day: String, lessons: List<Lesson>, teacher: Boolean, now: 
             ) {
                 PeriodChip(lesson.period.id)
                 Spacer(Modifier.width(10.dp))
+                SubjectIcon(lesson.subject, 26.dp)
+                Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(primaryText, fontWeight = FontWeight.Bold, color = if (isCurrent) colors.onContainer else MaterialTheme.colorScheme.onSurface)
                     secondaryText?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (isCurrent) colors.onContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -604,6 +624,16 @@ private fun DayTable(day: String, lessons: List<Lesson>, teacher: Boolean, now: 
             }
             if (i < lessons.lastIndex) Divider()
         }
+    }
+}
+
+// Shows nothing (not a placeholder box) when the subject has no matching
+// artwork yet, so layouts never show an empty/broken-looking square.
+@Composable
+private fun SubjectIcon(subject: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val res = subjectIconRes(subject)
+    if (res != null) {
+        Image(painter = painterResource(res), contentDescription = null, modifier = modifier.size(size))
     }
 }
 
@@ -759,13 +789,20 @@ private fun ToggleItem(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
 }
 
 @Composable
-private fun OptionCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, click: () -> Unit) = Card(
+private fun OptionCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, subjectForIcon: String? = null, click: () -> Unit) = Card(
     Modifier.fillMaxWidth().clickable(onClick = click), shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
 ) {
     Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Prefer the subject's own illustration when we have one; the generic
+        // Material icon is only a fallback (role picker, unmapped subjects).
+        val subjectRes = subjectForIcon?.let { subjectIconRes(it) }
         Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondary)
+            if (subjectRes != null) {
+                Image(painter = painterResource(subjectRes), contentDescription = null, modifier = Modifier.size(32.dp))
+            } else {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondary)
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column {

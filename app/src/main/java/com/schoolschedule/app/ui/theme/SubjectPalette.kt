@@ -1,6 +1,7 @@
 package com.schoolschedule.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.schoolschedule.app.R
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -34,4 +35,18 @@ fun subjectColor(subject: String, dark: Boolean): SubjectColor {
     val index = (subject.trim().sumOf { it.code } % palette.size).let { if (it < 0) it + palette.size else it }
     val (container, onContainer) = palette[index]
     return SubjectColor(container, onContainer)
+}
+
+// Matches the exact subject strings used in schedule.json. French currently
+// reuses the English icon and "معلوماتية" (computer science) reuses the
+// science icon until dedicated artwork exists for them.
+fun subjectIconRes(subject: String): Int? = when (subject.trim()) {
+    "عربي" -> R.drawable.subject_arabic
+    "لغة", "انجليزي", "إنجليزي", "فرنسي" -> R.drawable.subject_english
+    "رياضيات" -> R.drawable.subject_math
+    "علوم", "معلوماتية" -> R.drawable.subject_science
+    "اجتماعيات" -> R.drawable.subject_social
+    "اسلامية", "إسلامية" -> R.drawable.subject_islamic
+    "رياضة" -> R.drawable.subject_sports
+    else -> null
 }

@@ -21,15 +21,24 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
         ensureChannel(context)
+        val title = intent.getStringExtra("title") ?: "تنبيه الدوام"
+        val message = intent.getStringExtra("message") ?: ""
         val notification = NotificationCompat.Builder(context, NotificationScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(intent.getStringExtra("title") ?: "تنبيه الدوام")
-            .setContentText(intent.getStringExtra("message") ?: "")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(intent.getStringExtra("message") ?: ""))
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
-        context.getSystemService(NotificationManager::class.java).notify(intent.getIntExtra("id", 1), notification)
+        val id = intent.getIntExtra("id", 1)
+        context.getSystemService(NotificationManager::class.java).notify(id, notification)
+        // Log real class notifications the same way as test ones, so the delivery
+        // delay can be checked against actual daily usage, not just manual tests.
+        val scheduledAtMillis = intent.getLongExtra("scheduledAtMillis", -1L)
+        if (scheduledAtMillis > 0) {
+            NotificationTestStore.recordDelivery(context, id.toString(), "$title — $message", scheduledAtMillis, isTest = false)
+        }
     }
 
     // Records exactly when this fired (vs. when it was scheduled for) into the
@@ -40,7 +49,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val label = intent.getStringExtra("label") ?: "اختبار"
         val scheduledAtMillis = intent.getLongExtra("scheduledAtMillis", System.currentTimeMillis())
         val deliveredAtMillis = System.currentTimeMillis()
-        NotificationTestStore.recordDelivery(context, testId, label, scheduledAtMillis)
+        NotificationTestStore.recordDelivery(context, testId, label, scheduledAtMillis, isTest = true)
         ensureChannel(context)
         val deltaSeconds = (deliveredAtMillis - scheduledAtMillis) / 1000
         val body = if (deltaSeconds <= 2) "وصل بالوقت تمامًا ✅" else "تأخر عن الموعد بـ $deltaSeconds ثانية"
